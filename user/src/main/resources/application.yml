@@ -1,0 +1,64 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: user-service
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.web.servlet.CorsAutoConfiguration
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:5432/content_audit?useSSL=false&serverTimezone=America/Los_Angeles
+    username: admin
+    password: admin1234
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 60000
+      maximum-pool-size: 5
+      minimum-idle: 2
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      connection-test-query: SELECT 1
+      initialization-fail-timeout: 60000
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:audit-consul}
+      port: 8500
+      discovery:
+        register: true
+        enabled: true
+        service-name: user-service
+        prefer-ip-address: true
+        health-check-path: /actuator/health
+        health-check-interval: 15s
+  redis:
+    host: ${REDIS_HOST:audit-redis}
+    port: 6379
+    database: 0
+
+jwt:
+  secret: mySecretKey123456789
+  expiration: 86400
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    root: INFO
+    com.audit.user: DEBUG
+    com.zaxxer.hikari: DEBUG
+    com.zaxxer.hikari.HikariConfig: DEBUG
+    org.springframework.boot.autoconfigure: DEBUG
+    org.springframework.boot.autoconfigure.jdbc: DEBUG
+    org.springframework.web: DEBUG 

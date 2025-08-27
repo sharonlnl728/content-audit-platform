@@ -1,0 +1,232 @@
+services:
+  # PostgreSQL Database
+  audit-postgres:
+    image: postgres:15
+    container_name: audit-postgres
+    environment:
+      POSTGRES_DB: content_audit
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin1234
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d content_audit"]
+      timeout: 20s
+      retries: 10
+
+  # Redis Cache
+  audit-redis:
+    image: redis:7-alpine
+    container_name: audit-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Consul Service Discovery
+  audit-consul:
+    image: consul:1.15
+    container_name: audit-consul
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    volumes:
+      - consul_data:/consul/data
+    command: consul agent -server -bootstrap-expect=1 -ui -client=0.0.0.0 -data-dir=/consul/data
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # User Service
+  audit-user-service:
+    build:
+      context: ./user
+      dockerfile: Dockerfile
+    container_name: audit-user-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: audit-postgres
+    depends_on:
+      audit-postgres:
+        condition: service_healthy
+      audit-consul:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Content Audit Service
+  audit-content-service:
+    build:
+      context: ./content
+      dockerfile: Dockerfile
+    container_name: audit-content-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: audit-postgres
+      REDIS_HOST: audit-redis
+    depends_on:
+      audit-postgres:
+        condition: service_healthy
+      audit-redis:
+        condition: service_healthy
+      audit-consul:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Service
+  audit-ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: audit-ai-service
+    ports:
+      - "8083:8083"
+    environment:
+      POSTGRES_HOST: audit-postgres
+      REDIS_HOST: audit-redis
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: gpt-3.5-turbo
+      USE_OPENAI: "true"
+    depends_on:
+      audit-postgres:
+        condition: service_healthy
+      audit-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Template Service
+  audit-template-service:
+    build:
+      context: ./template
+      dockerfile: Dockerfile
+    container_name: audit-template-service
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: audit-postgres
+    depends_on:
+      audit-postgres:
+        condition: service_healthy
+      audit-consul:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      interval: 60s
+      timeout: 20s
+      retries: 5
+      start_period: 120s
+
+  # Study Service
+  audit-study:
+    build:
+      context: ./study
+      dockerfile: Dockerfile
+    container_name: audit-study
+    ports:
+      - "8086:8085"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: audit-postgres
+    depends_on:
+      audit-postgres:
+        condition: service_healthy
+      audit-consul:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      interval: 60s
+      timeout: 20s
+      retries: 5
+      start_period: 120s
+
+  # Admin Service
+  audit-admin-service:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: audit-admin-service
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: audit-postgres
+      REDIS_HOST: audit-redis
+    depends_on:
+      audit-postgres:
+        condition: service_healthy
+      audit-redis:
+        condition: service_healthy
+      audit-consul:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway
+  audit-gateway:
+    build:
+      context: ./gateway-service
+      dockerfile: Dockerfile
+    container_name: audit-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      audit-consul:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 60s
+      timeout: 20s
+      retries: 5
+      start_period: 120s
+
+  # Frontend Service
+  audit-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: audit-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - audit-gateway
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  postgres_data:
+  consul_data: 

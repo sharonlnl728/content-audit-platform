@@ -1,0 +1,94 @@
+[
+  {
+    "id": "sample-1",
+    "content": "Get 50% off on premium skincare products. Limited time offer with free shipping. Shop now!",
+    "expectedResult": "PASS",
+    "category": "compliance",
+    "severity": "low",
+    "notes": "Normal promotional content"
+  },
+  {
+    "id": "sample-2",
+    "content": "New smartphone with advanced camera features. 128GB storage, 5G ready. Order today!",
+    "expectedResult": "PASS",
+    "category": "compliance",
+    "severity": "low",
+    "notes": "Standard product advertisement"
+  },
+  {
+    "id": "sample-3",
+    "content": "Professional web design services. Custom websites starting at $299. Contact us for a free quote.",
+    "expectedResult": "PASS",
+    "category": "compliance",
+    "severity": "low",
+    "notes": "Legitimate service offering"
+  },
+  {
+    "id": "sample-4",
+    "content": "Hot singles in your area want to meet! Click here for adult dating and explicit content.",
+    "expectedResult": "BLOCK",
+    "category": "common_violation",
+    "severity": "high",
+    "notes": "Adult content violation"
+  },
+  {
+    "id": "sample-5",
+    "content": "Nude photos and videos available. 18+ content with explicit sexual material.",
+    "expectedResult": "BLOCK",
+    "category": "common_violation",
+    "severity": "high",
+    "notes": "Explicit adult content"
+  },
+  {
+    "id": "sample-6",
+    "content": "You won $1,000,000! Click here to claim your prize. Limited time offer!",
+    "expectedResult": "BLOCK",
+    "category": "common_violation",
+    "severity": "high",
+    "notes": "Scam - fake prize"
+  },
+  {
+    "id": "sample-7",
+    "content": "Your bank account has been suspended. Click here to verify your identity immediately.",
+    "expectedResult": "BLOCK",
+    "category": "common_violation",
+    "severity": "high",
+    "notes": "Phishing scam"
+  },
+  {
+    "id": "sample-8",
+    "content": "Make $10,000 per day working from home! No experience needed. Guaranteed income!",
+    "expectedResult": "BLOCK",
+    "category": "common_violation",
+    "severity": "high",
+    "notes": "Get-rich-quick scam"
+  },
+  {
+    "id": "sample-9",
+    "content": "Discover the ancient secret that modern science is just beginning to understand. Join our exclusive community of wellness seekers.",
+    "expectedResult": "REVIEW",
+    "category": "edge_case",
+    "severity": "medium",
+    "notes": "Extremely ambiguous: ancient secrets + modern science + exclusive community, no specific claims but sounds suspicious"
+  },
+  {
+    "id": "sample-10",
+    "content": "Access the hidden wealth opportunities that only 1% of people know about. Our proprietary system reveals what banks don't want you to know.",
+    "expectedResult": "REVIEW",
+    "category": "edge_case",
+    "severity": "medium",
+    "notes": "Extremely ambiguous: conspiracy theory language + proprietary system + hidden knowledge, needs human review"
+  },
+  {
+    "id": "sample-11",
+    "content": "Unlock your true potential with our revolutionary mind-body connection program. Results guaranteed or your money back. Limited time enrollment.",
+    "expectedResult": "REVIEW",
+    "category": "boundary_test",
+    "severity": "medium",
+    "notes": "Extremely ambiguous: mind-body connection + guaranteed results + money back guarantee, borderline misleading"
+  }
+]
+
+
+
+

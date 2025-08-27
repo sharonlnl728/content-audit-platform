@@ -1,0 +1,2 @@
+# Note: Redis deployment is now organized in k8s/redis/redis-deployment.yaml
+# This file is kept for backward compatibility but the main deployment is in the redis subdirectory 
