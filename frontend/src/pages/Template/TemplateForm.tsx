@@ -78,7 +78,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           ...values
         };
         
-        const response = await api.updateTemplate(template.id, updateData);
+        await api.updateTemplate(template.id, updateData);
         message.success('Template updated successfully');
       } else {
         // Create new template

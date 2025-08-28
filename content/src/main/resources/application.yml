@@ -18,6 +18,11 @@ spring:
         prefer-ip-address: true
         health-check-path: /actuator/health
         health-check-interval: 15s
+        health-check-timeout: 5s
+        instance-id: ${spring.application.name}:${server.port}
+        deregister: true
+        register-health-check: true
+        health-check-critical-timeout: 30s
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:audit-postgres}:5432/content_audit?useSSL=false&serverTimezone=America/Los_Angeles
     username: admin
@@ -44,9 +49,11 @@ spring:
     port: 6379
     database: 0
 
-ai:
-  service:
-    url: http://audit-ai-service:8083
+# AI Service configuration
+ai-service:
+  base-url: http://ai-service:8083
+  connect-timeout: 30000    # Connection timeout: 30 seconds
+  read-timeout: 120000      # Read timeout: 120 seconds (2 minutes), supports AI batch processing
 
 management:
   endpoints:
@@ -64,15 +71,15 @@ logging:
     org.springframework.boot.autoconfigure.jdbc: DEBUG
     org.springframework.web: DEBUG
 
-# 添加启动延迟
+# Add startup delay
 spring.lifecycle.timeout-per-shutdown-phase: 30s
 
-# 添加延迟启动
+# Add delayed startup
 spring.main.lazy-initialization: true
 
 feign:
   client:
     config:
       default:
-        connect-timeout: 30000    # 连接超时：30秒
-        read-timeout: 120000      # 读取超时：120秒（2分钟），支持 AI 批量处理 
+        connect-timeout: 30000    # Connection timeout: 30 seconds
+        read-timeout: 120000      # Read timeout: 120 seconds (2 minutes), supports AI batch processing 

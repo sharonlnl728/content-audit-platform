@@ -3,17 +3,13 @@ package com.audit.study.service;
 import com.audit.study.dto.StudyDto;
 import com.audit.study.dto.StudyRecordBatchRequest;
 import com.audit.study.dto.StudyRecordDto;
-import com.audit.study.dto.StudyRecordsPageResponse;
+
 import com.audit.study.entity.Study;
 import com.audit.study.entity.StudyRecord;
 import com.audit.study.repository.StudyRepository;
 import com.audit.study.repository.StudyRecordRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.RestTemplate;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -144,11 +140,7 @@ public class StudyService {
         return convertToDto(savedStudy);
     }
 
-    private String safeJson(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
-    }
-    
+
     /**
      * Update Study record status and results (called by Content Service)
      */
@@ -261,62 +253,11 @@ public class StudyService {
         }
     }
 
-    private AiAuditResult callAiTextAudit(String content, String templateId) {
-        RestTemplate restTemplate = new RestTemplate();
-        String url = "http://audit-ai-service:8083/ai/text/audit";
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        
-        // Build request body with content and template_config
-        String requestBody;
-        if (templateId != null && !templateId.isBlank()) {
-            // If templateId exists, try to get template configuration
-            try {
-                // Call template service to get configuration - using correct port and path
-                String templateUrl = "http://audit-template-service:8082/api/template/" + templateId;
-                System.out.println("DEBUG: Fetching template config from: " + templateUrl);
-                
-                ResponseEntity<String> templateResponse = restTemplate.getForEntity(templateUrl, String.class);
-                if (templateResponse.getStatusCode().is2xxSuccessful()) {
-                    // Parse template configuration
-                    String templateConfig = templateResponse.getBody();
-                    System.out.println("DEBUG: Template config received: " + templateConfig);
-                    
-                    // Build request with template_config
-                    requestBody = "{\"content\": " + toJsonString(content) + ", \"template_config\": " + templateConfig + "}";
-                    System.out.println("DEBUG: Request body with template: " + requestBody);
-                } else {
-                    // If template fetch fails, use default configuration
-                    System.out.println("DEBUG: Failed to get template config, status: " + templateResponse.getStatusCode());
-                    requestBody = "{\"content\": " + toJsonString(content) + "}";
-                }
-            } catch (Exception e) {
-                // If template fetch fails, use default configuration
-                System.out.println("DEBUG: Exception getting template config: " + e.getMessage());
-                requestBody = "{\"content\": " + toJsonString(content) + "}";
-            }
-        } else {
-            // No templateId provided, use default configuration
-            System.out.println("DEBUG: No templateId provided, using default config");
-            requestBody = "{\"content\": " + toJsonString(content) + "}";
-        }
-        
-        HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
-        return restTemplate.postForObject(url, entity, AiAuditResult.class);
-    }
 
-    private String toJsonString(String s) {
-        if (s == null) return "\"\"";
-        String escaped = s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
-        return "\"" + escaped + "\"";
-    }
 
-    public static class AiAuditResult {
-        public Boolean isViolation;
-        public Double confidence;
-        public String reason;
-        public String categories; // keep raw JSON array string if available
-    }
+
+
+
 
     @Transactional
     public StudyDto uploadRecords(String userInfo,
@@ -329,6 +270,11 @@ public class StudyService {
         Study study = studyRepository.findByIdAndUserId(studyId, userId).orElseThrow(() -> new RuntimeException("Study not found"));
 
         try {
+            // Check if file is null or has no original filename
+            if (file == null || file.getOriginalFilename() == null) {
+                throw new RuntimeException("Invalid file: file is null or has no filename");
+            }
+            
             String fmt = (format == null || format.isBlank()) ? guessFormat(file.getOriginalFilename()) : format.toLowerCase();
             StudyRecord.ContentType fallbackType = parseContentType(defaultContentType);
 

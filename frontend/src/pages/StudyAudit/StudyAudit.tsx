@@ -399,7 +399,7 @@ const StudyAudit: React.FC = () => {
             
             // Update progress
             processedCount++;
-            const progress = (processedCount / allRecords.length) * 100;
+            const progress = Math.round((processedCount / allRecords.length) * 100);
             setAiProgress(progress);
             setAiResults(results);
             
@@ -551,7 +551,7 @@ const StudyAudit: React.FC = () => {
           
           // Update progress
           processedCount++;
-          const progress = (processedCount / selectedRecords.length) * 100;
+          const progress = Math.round((processedCount / selectedRecords.length) * 100);
           setAiProgress(progress);
           setAiResults(results);
           
@@ -831,34 +831,60 @@ const StudyAudit: React.FC = () => {
       {/* Study Statistics */}
       <Row gutter={16} className="mb-6">
         <Col span={8}>
-          <Card className="bg-white/95 backdrop-blur-xl border-purple-200 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl">
-            <Statistic
-              title="Total Records"
-              value={study.total_records}
-              valueStyle={{ color: '#52c41a' }}
-            />
+          <Card className="bg-white/95 backdrop-blur-xl border-purple-200 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl h-32">
+            <div className="h-full flex flex-col justify-center">
+              <Statistic
+                title="Total Records"
+                value={study.total_records}
+                valueStyle={{ color: '#52c41a' }}
+              />
+            </div>
           </Card>
         </Col>
         <Col span={8}>
-          <Card className="bg-white/95 backdrop-blur-xl border-purple-200 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl">
-            <Statistic
-              title="AI Processed"
-              value={`${study.total_records - study.pending_records}/${study.total_records}`}
-              suffix={`(${study.total_records > 0 ? Math.round(((study.total_records - study.pending_records) / study.total_records) * 100) : 0}%)`}
-              valueStyle={{ color: '#1890ff' }}
-            />
+          <Card className="bg-white/95 backdrop-blur-xl border-purple-200 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl h-32">
+            <div className="h-full flex flex-col justify-center">
+              <Statistic
+                title={
+                  <div className="flex justify-between items-center">
+                    <span>AI Results</span>
+                    <span className="text-blue-600 font-medium text-xs">
+                      ({study.total_records > 0 ? Math.round(((study.total_records - study.pending_records) / study.total_records) * 100) : 0}%)
+                    </span>
+                  </div>
+                }
+                value={0}
+                suffix={
+                  <div className="text-center mt-3">
+                    <div className="text-sm">
+                      <span className="text-green-600 font-medium">PASS: {records.filter(r => r.status === 'PASS').length}</span>
+                      <span className="mx-2 text-slate-400">|</span>
+                      <span className="text-red-600 font-medium">REJECT: {records.filter(r => r.status === 'REJECT').length}</span>
+                      <span className="mx-2 text-slate-400">|</span>
+                      <span className="text-orange-600 font-medium">REVIEW: {records.filter(r => r.status === 'REVIEW').length}</span>
+                    </div>
+                  </div>
+                }
+                valueStyle={{ color: '#1890ff', fontSize: '0px', lineHeight: '0px' }}
+                className="[&_.ant-statistic-content-value]:!text-transparent"
+              />
+            </div>
           </Card>
         </Col>
         <Col span={8}>
-          <Card className="bg-white/95 backdrop-blur-xl border-purple-200 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl">
-            <Statistic
-              title="Pending"
-              value={study.pending_records}
-              valueStyle={{ color: '#faad14' }}
-            />
+          <Card className="bg-white/95 backdrop-blur-xl border-purple-200 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl h-32">
+            <div className="h-full flex flex-col justify-center">
+              <Statistic
+                title="Pending"
+                value={study.pending_records}
+                valueStyle={{ color: '#faad14' }}
+              />
+            </div>
           </Card>
         </Col>
       </Row>
+
+
 
       <Card className="bg-white/95 backdrop-blur-xl border-purple-200 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl">
         <Tabs activeKey={activeTab} onChange={setActiveTab}>
@@ -1134,15 +1160,7 @@ const StudyAudit: React.FC = () => {
               </div>
             </Card>
 
-            {/* AI Results Summary */}
-            <div className="flex justify-center text-sm text-slate-600 mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-              <span className="font-medium">AI Results Summary:</span>
-              <span className="ml-3">
-                PASS: {records.filter(r => r.status === 'PASS').length} | 
-                REJECT: {records.filter(r => r.status === 'REJECT').length} | 
-                REVIEW: {records.filter(r => r.status === 'REVIEW').length}
-              </span>
-            </div>
+
 
             {/* Prompt when no template is selected */}
             {!selectedTemplateId && (

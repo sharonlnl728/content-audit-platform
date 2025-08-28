@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# OpenAI Configuration File
-# 请将下面的 'your-api-key-here' 替换为你的真实OpenAI API Key
+# Please replace 'your-api-key-here' below with your real OpenAI API Key
 
 export OPENAI_API_KEY="your-api-key-here"
 export USE_OPENAI=true

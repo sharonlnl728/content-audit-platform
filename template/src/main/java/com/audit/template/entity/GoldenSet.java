@@ -38,7 +38,10 @@ public class GoldenSet {
     @Column(name = "is_default")
     private Boolean isDefault;
     
-    @OneToMany(mappedBy = "goldenSet", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "goldenSet", 
+               cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH}, 
+               fetch = FetchType.EAGER,
+               orphanRemoval = true)
     @JsonManagedReference
     private List<GoldenSetSample> samples;
     

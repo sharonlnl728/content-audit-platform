@@ -44,8 +44,8 @@ app = FastAPI(
 openai_client = None
 if config.is_openai_available():
     try:
-        openai.api_key = config.get_openai_api_key()
-        openai_client = openai
+        from openai import OpenAI
+        openai_client = OpenAI(api_key=config.get_openai_api_key())
         logger.info(f"OpenAI client initialized successfully with model: {config.get_openai_model()}")
     except Exception as e:
         logger.error(f"Failed to initialize OpenAI client: {e}")
@@ -151,7 +151,6 @@ When in doubt about whether content is clearly violating or clearly safe, classi
         
         # Override with template-specific prompt if available
         if template_config and 'ai_prompt_template' in template_config:
-            print(f"DEBUG: Found ai_prompt_template in config: {template_config['ai_prompt_template']}")
             ai_prompt_template = template_config['ai_prompt_template']
             
             # Handle both dict and list formats
@@ -168,14 +167,11 @@ When in doubt about whether content is clearly violating or clearly safe, classi
                 template_system_prompt = str(ai_prompt_template)
                 
             if template_system_prompt:
-                print(f"DEBUG: Using custom system prompt (length: {len(template_system_prompt)})")
                 system_prompt = template_system_prompt
-            else:
-                print("DEBUG: No system_prompt found in ai_prompt_template")
         else:
-            print("DEBUG: No ai_prompt_template found in template_config")
+            pass
         
-        response = openai_client.ChatCompletion.create(
+        response = openai_client.chat.completions.create(
             model=config.get_openai_model(),
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -257,7 +253,7 @@ When in doubt about whether content is clearly violating or clearly safe, classi
             confidence=result.get("confidence", 0.5),
             reason=result.get("reason", f"Content analyzed by OpenAI: {status}"),
             categories=categories,
-            status=final_status  # 恢复 status 字段
+            status=final_status  # Restore status field
         )
         
     except Exception as e:
@@ -291,11 +287,18 @@ def rule_based_text_audit(content: str) -> AuditResponse:
         confidence = 0.95
         reason = "Content normal"
     
+    # Determine status based on violation
+    if is_violation:
+        status = "BLOCK"
+    else:
+        status = "PASS"
+    
     return AuditResponse(
         is_violation=is_violation,
         confidence=confidence,
         reason=reason,
-        categories=categories
+        categories=categories,
+        status=status
     )
 
 def model_based_text_audit(content: str) -> AuditResponse:
@@ -527,12 +530,9 @@ async def health_check():
 async def audit_text(request: TextAuditRequest):
     """Text content audit"""
     try:
-        print(f"DEBUG: Received audit request - content length: {len(request.content) if request.content else 0}")
-        print(f"DEBUG: Template config received: {request.template_config is not None}")
         if request.template_config:
-            print(f"DEBUG: Template config keys: {list(request.template_config.keys())}")
             if 'ai_prompt_template' in request.template_config:
-                print(f"DEBUG: ai_prompt_template found: {request.template_config['ai_prompt_template']}")
+                pass
         
         if not request.content or not request.content.strip():
             raise HTTPException(status_code=400, detail="Content cannot be empty")

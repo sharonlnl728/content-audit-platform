@@ -1,32 +1,34 @@
-FROM maven:3.8.4-openjdk-17 AS builder
+# Build stage
+FROM maven:3.8.4-openjdk-11 AS builder
 
 WORKDIR /app
 COPY pom.xml .
 COPY src ./src
 
-# 编译Java代码
+# Compile Java code
 RUN mvn clean package -DskipTests
 
-# 运行阶段
-FROM openjdk:17-slim
+# Runtime stage
+FROM openjdk:11-jre-slim
 
-WORKDIR /app
-
-# 安装必要的工具和时区数据
+# Install necessary tools and timezone data
 RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client curl tzdata && rm -rf /var/lib/apt/lists/*
 
-# 设置时区为UTC
+# Set timezone to UTC
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 复制启动脚本
+WORKDIR /app
+
+# Copy startup script
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-# 从构建阶段复制JAR文件
-COPY --from=builder /app/target/*.jar app.jar
-
+# Expose port
 EXPOSE 8082
 
-# 使用启动脚本
-ENTRYPOINT ["/start.sh"]
+# Copy JAR file from build stage
+COPY --from=builder /app/target/*.jar app.jar
+
+# Use startup script
+CMD ["/start.sh"]

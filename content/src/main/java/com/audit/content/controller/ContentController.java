@@ -34,6 +34,14 @@
                 System.out.println("=== CONTROLLER DEBUG ===");
                 System.out.println("Content length: " + (request.getContent() != null ? request.getContent().length() : 0));
                 System.out.println("TemplateConfig: " + (request.getTemplateConfig() != null ? "RECEIVED" : "NULL"));
+                System.out.println("ForceRefresh: " + request.getForceRefresh() + " (type: " + (request.getForceRefresh() != null ? request.getForceRefresh().getClass().getSimpleName() : "null") + ")");
+                
+                // Debug: Log raw request data
+                System.out.println("=== RAW REQUEST DEBUG ===");
+                System.out.println("Raw request object: " + request);
+                System.out.println("Raw request class: " + request.getClass().getName());
+                System.out.println("Raw forceRefresh field: " + request.getForceRefresh());
+                System.out.println("=========================");
                 
                 if (request.getTemplateConfig() != null) {
                     System.out.println("TemplateConfig keys: " + request.getTemplateConfig().keySet());

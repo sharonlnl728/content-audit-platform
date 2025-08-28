@@ -5,7 +5,7 @@ import com.audit.template.dto.AuditTemplateDto;
 import com.audit.template.entity.AuditTemplate;
 import com.audit.template.entity.GoldenSet;
 import com.audit.template.repository.AuditTemplateRepository;
-import com.audit.template.service.GoldenSetService;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
@@ -154,43 +154,13 @@ public class AuditTemplateService {
         return convertToDto(updated);
     }
 
-    private String sanitizeJsonOrDefault(Object raw) {
-        if (raw == null) {
-            return "[]"; // Return empty array for rules
-        }
-        try {
-            // Convert Object to JSON string
-            String jsonString = JSON.toJSONString(raw);
-            // Ensure it's not empty or just braces
-            if (jsonString == null || jsonString.trim().isEmpty() || jsonString.equals("{}")) {
-                return "[]"; // Return empty array as default
-            }
-            // Additional check: if it's an empty object string, return empty array
-            if (jsonString.trim().equals("{}")) {
-                return "[]"; // Return empty array as default
-            }
-            return jsonString;
-        } catch (Exception e) {
-            return "[]"; // Return empty array on any error
-        }
-    }
+
 
     /**
-     * Generate or validate Template ID
-     * If no Template ID is provided, automatically generate one
-     * If provided, validate the format
+     * Generate Template ID automatically based on name and content type
      */
     private String generateOrValidateTemplateId(AuditTemplateDto templateDto) {
-        String providedId = templateDto.getTemplateId();
-        
-        // If no Template ID provided, generate one automatically
-        if (providedId == null || providedId.trim().isEmpty()) {
-            return generateTemplateId(templateDto.getName(), templateDto.getContentType());
-        }
-        
-        // If provided, validate the format
-        validateTemplateId(providedId);
-        return providedId;
+        return generateTemplateId(templateDto.getName(), templateDto.getContentType());
     }
     
     /**
@@ -214,24 +184,7 @@ public class AuditTemplateService {
         return ensureUniqueTemplateId(templateId);
     }
     
-    /**
-     * Validate Template ID format
-     */
-    private void validateTemplateId(String templateId) {
-        if (templateId == null || templateId.trim().isEmpty()) {
-            throw new RuntimeException("Template ID cannot be empty");
-        }
-        
-        // Check if it follows the standard format: TPL-XXX
-        if (!templateId.matches("^TPL-[A-Z0-9-]+$")) {
-            throw new RuntimeException("Template ID must follow format: TPL-XXX (e.g., TPL-LANDING-PAGE)");
-        }
-        
-        // Check length
-        if (templateId.length() > 50) {
-            throw new RuntimeException("Template ID cannot exceed 50 characters");
-        }
-    }
+
     
     /**
      * Ensure Template ID is unique by adding suffix if needed
@@ -253,27 +206,7 @@ public class AuditTemplateService {
         return templateId;
     }
 
-    private Map<String, Object> sanitizeMapOrDefault(Map<String, Object> raw) {
-        if (raw == null) {
-            return new HashMap<>();
-        }
-        return raw;
-    }
 
-    private List<String> sanitizeListOrDefault(List<String> raw) {
-        if (raw == null) {
-            return new ArrayList<>();
-        }
-        return raw;
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> castToMap(Object obj) {
-        if (obj instanceof Map) {
-            return (Map<String, Object>) obj;
-        }
-        return new HashMap<>();
-    }
 
     /**
      * Parse JSON string or Map object to Map<String, Object>

@@ -59,10 +59,15 @@ public class ContentAuditService {
         }
         Long userId = Long.valueOf(userIdObj.toString());
         
-        // 1. Calculate content hash (include template config in cache key if available)
+        // 1. Calculate content hash (include template config and timestamp in cache key for force refresh)
         String cacheKey = "audit:text:" + DigestUtils.sha256Hex(content);
         if (templateConfig != null) {
             cacheKey += ":" + DigestUtils.sha256Hex(JSON.toJSONString(templateConfig));
+        }
+        
+        // Add timestamp to cache key when force refresh is enabled to ensure fresh results
+        if (forceRefresh != null && forceRefresh) {
+            cacheKey += ":" + System.currentTimeMillis();
         }
         
         // 2. Check cache (skip if force refresh is enabled)
@@ -272,7 +277,9 @@ public class ContentAuditService {
         
         // Update review status
         record.setStatus(AuditRecord.AuditStatus.valueOf(request.getStatus()));
-        record.setManualResult(JSON.parseObject(JSON.toJSONString(request), Map.class));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> manualResult = (Map<String, Object>) JSON.parseObject(JSON.toJSONString(request), Map.class);
+        record.setManualResult(manualResult);
         record.setReviewerId(reviewerId);
         record.setReviewedAt(LocalDateTime.now());
         
@@ -328,7 +335,9 @@ public class ContentAuditService {
             record.setContentText(contentText);
             record.setContentUrl(contentUrl);
             record.setContentHash(result.getContentHash());
-            record.setAuditResult(JSON.parseObject(JSON.toJSONString(result), Map.class));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> auditResult = (Map<String, Object>) JSON.parseObject(JSON.toJSONString(result), Map.class);
+            record.setAuditResult(auditResult);
             record.setConfidence(new BigDecimal(result.getConfidence()));
             
             // Handle null status
@@ -339,7 +348,9 @@ public class ContentAuditService {
                 record.setStatus(AuditRecord.AuditStatus.REVIEW);
             }
             
-            record.setAiResult(JSON.parseObject(JSON.toJSONString(aiResponse), Map.class));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> aiResult = (Map<String, Object>) JSON.parseObject(JSON.toJSONString(aiResponse), Map.class);
+            record.setAiResult(aiResult);
             
             auditRecordRepository.save(record);
         } catch (Exception e) {

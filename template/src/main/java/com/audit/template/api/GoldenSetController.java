@@ -17,6 +17,7 @@ import com.audit.template.service.GoldenSetService;
 import com.audit.template.dto.GoldenSetDto;
 import com.audit.template.entity.GoldenSet;
 import java.util.Optional;
+import com.audit.template.dto.GoldenSampleDto;
 
 @RestController
 @RequestMapping("/api/template/golden-sets")
@@ -131,6 +132,7 @@ public class GoldenSetController {
   }
   
   // Upload Golden Set file for specified template
+  @SuppressWarnings("null")
   @PostMapping("/templates/{templateId}/upload")
   public Map<String, Object> uploadForTemplate(
       @PathVariable String templateId,
@@ -162,15 +164,16 @@ public class GoldenSetController {
       if (importedData.containsKey("samples") && importedData.get("samples") instanceof List) {
         // Direct format
         templateData = importedData;
-        samples = (List<Map<String, Object>>) importedData.get("samples");
+        samples = castToListOfMaps(importedData.get("samples"));
       } else {
         // Nested format, find first key containing samples
         for (Map.Entry<String, Object> entry : importedData.entrySet()) {
           if (entry.getValue() instanceof Map) {
+            @SuppressWarnings("unchecked")
             Map<String, Object> nestedData = (Map<String, Object>) entry.getValue();
             if (nestedData.containsKey("samples") && nestedData.get("samples") instanceof List) {
               templateData = nestedData;
-              samples = (List<Map<String, Object>>) nestedData.get("samples");
+              samples = castToListOfMaps(nestedData.get("samples"));
               break;
             }
           }
@@ -452,18 +455,42 @@ public class GoldenSetController {
       
       Long userId = Long.valueOf(userIdObj.toString());
       
-      // Convert DTO to entity
+      // Convert DTO to entity - properly handle samples field
       GoldenSet goldenSet = new GoldenSet();
+      goldenSet.setId(goldenSetDto.getId());
       goldenSet.setName(goldenSetDto.getName());
       goldenSet.setDescription(goldenSetDto.getDescription());
       goldenSet.setCategory(goldenSetDto.getCategory());
       goldenSet.setVersion(goldenSetDto.getVersion());
+      goldenSet.setIsDefault(goldenSetDto.getIsDefault());
+      
+      // Properly handle samples field to prevent cascade deletion
+      if (goldenSetDto.getSamples() != null) {
+          // Convert GoldenSampleDto to GoldenSetSample entity
+        List<GoldenSetSample> samples = new ArrayList<>();
+        for (GoldenSampleDto sampleDto : goldenSetDto.getSamples()) {
+          GoldenSetSample sample = new GoldenSetSample();
+          sample.setId(sampleDto.getId());
+          sample.setSampleId(sampleDto.getSampleId());
+          sample.setContent(sampleDto.getContent());
+          sample.setExpectedResult(sampleDto.getExpectedResult());
+          sample.setCategory(sampleDto.getCategory());
+          sample.setSeverity(sampleDto.getSeverity());
+          sample.setNotes(sampleDto.getNotes());
+          sample.setAiStatus(sampleDto.getAiStatus() != null ? 
+            GoldenSetSample.AiStatus.valueOf(sampleDto.getAiStatus()) : 
+            GoldenSetSample.AiStatus.PENDING);
+          sample.setCreatedAt(sampleDto.getCreatedAt());
+          sample.setUpdatedAt(sampleDto.getUpdatedAt());
+          samples.add(sample);
+        }
+        goldenSet.setSamples(samples);
+      }
       
       // Update Golden Set
       GoldenSet updated = goldenSetService.updateGoldenSet(id, goldenSet, userId);
       
       response.put("ok", true);
-      response.put("message", "Golden Set updated successfully");
       response.put("data", updated);
       
     } catch (Exception e) {
@@ -579,5 +606,26 @@ public class GoldenSetController {
     }
     
     return response;
+  }
+  
+  /**
+   * Safely cast Object to List<Map<String, Object>>
+   * This method provides type-safe conversion and eliminates unchecked cast warnings
+   */
+  @SuppressWarnings("unchecked")
+  private List<Map<String, Object>> castToListOfMaps(Object obj) {
+    if (obj instanceof List) {
+      List<?> list = (List<?>) obj;
+      // Check if all elements are Maps
+      for (Object item : list) {
+        if (!(item instanceof Map)) {
+          return new ArrayList<>();
+        }
+      }
+      // Safe cast after type checking
+      List<Map<String, Object>> result = (List<Map<String, Object>>) obj;
+      return result;
+    }
+    return new ArrayList<>();
   }
 }

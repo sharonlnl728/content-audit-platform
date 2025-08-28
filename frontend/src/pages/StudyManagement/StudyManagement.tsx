@@ -10,7 +10,7 @@ import {
   Progress,
   Space,
   Table,
-  Tooltip,
+  // Tooltip,
   Typography
 } from 'antd';
 import {
@@ -111,7 +111,7 @@ const StudyManagement: React.FC = () => {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
-      width: 200,
+      width: 250,
       ellipsis: true,
       render: (text: string) => (
         <Text strong style={{ color: '#1e293b' }}>{text}</Text>
@@ -121,7 +121,7 @@ const StudyManagement: React.FC = () => {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
-      width: 400,
+      width: 300,
       ellipsis: true,
       render: (text: string) => (
         <Text 
@@ -135,7 +135,7 @@ const StudyManagement: React.FC = () => {
     {
       title: 'Progress',
       key: 'progress',
-      width: 250,
+      width: 200,
       render: (record: Study) => {
         // Progress based on AI processing status: processed records / total records
         const processedRecords = record.total_records - record.pending_records;
@@ -174,7 +174,7 @@ const StudyManagement: React.FC = () => {
       title: 'Created',
       dataIndex: 'created_at',
       key: 'createdAt',
-      width: 120,
+      width: 100,
       render: (date: string) => (
         <Text style={{ color: '#64748b' }}>
           {new Date(date).toLocaleDateString()}
@@ -251,14 +251,13 @@ const StudyManagement: React.FC = () => {
             dataSource={studies}
             loading={loading}
             rowKey="id"
-            scroll={{ x: 800 }}  // Set same horizontal scroll as Template Management
+            scroll={{ x: 1030 }}  // Adjusted from 1050px to 1030px after reducing Created column width
             pagination={{
               pageSize: 10,
               showSizeChanger: true,
               showQuickJumper: true,
             }}
             className="user-table"
-            style={{ tableLayout: 'fixed' }}
           />
         </div>
       </Card>

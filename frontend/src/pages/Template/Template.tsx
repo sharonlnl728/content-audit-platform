@@ -178,10 +178,10 @@ const Template: React.FC = () => {
           <div className="text-xs text-slate-600 line-clamp-2">{record.description}</div>
         </div>
       ),
-      width: 350,
+      width: 400,
     },
     {
-      title: 'Type & Version',
+      title: 'Details',
       key: 'type',
       render: (_: any, record: AuditTemplate) => (
         <div className="space-y-2">
@@ -192,7 +192,7 @@ const Template: React.FC = () => {
           </div>
         </div>
       ),
-      width: 130,
+      width: 100,
     },
     {
       title: 'Status',
@@ -208,7 +208,6 @@ const Template: React.FC = () => {
         </div>
       ),
       width: 100,
-      align: 'center' as const,
     },
     {
       title: 'Last Updated',
@@ -231,7 +230,7 @@ const Template: React.FC = () => {
           </div>
         );
       },
-      width: 120,
+      width: 100,
     },
     {
       title: 'Actions',
@@ -267,7 +266,6 @@ const Template: React.FC = () => {
         </Space>
       ),
       width: 100,
-      align: 'center' as const,
     },
   ];
 

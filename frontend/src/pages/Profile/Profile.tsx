@@ -15,16 +15,9 @@ interface UserProfile {
   last_login?: string;
 }
 
-interface UserStatistics {
-  studiesCreated: number;
-  recordsReviewed: number;
-  templatesUsed: number;
-}
-
 const Profile: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [statistics, setStatistics] = useState<UserStatistics | null>(null);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<UserProfile>>({});
@@ -35,7 +28,6 @@ const Profile: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated) {
       fetchProfile();
-      fetchStatistics();
     }
   }, [isAuthenticated]);
 
@@ -54,19 +46,6 @@ const Profile: React.FC = () => {
       message.error('Failed to fetch profile');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchStatistics = async () => {
-    try {
-      const response = await api.getUserStatistics();
-      if (response.data.code === 200) {
-        setStatistics(response.data.data);
-      } else {
-        console.error('Failed to fetch statistics:', response.data.message);
-      }
-    } catch (error) {
-      console.error('Failed to fetch statistics:', error);
     }
   };
 
@@ -323,31 +302,6 @@ const Profile: React.FC = () => {
                   )}
                 </div>
               </div>
-            </div>
-          </div>
-        </Card>
-      </motion.div>
-
-              {/* Account statistics */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <Card className="bg-white/95 backdrop-blur-xl border-slate-200 shadow-xl rounded-2xl">
-          <h3 className="text-xl font-semibold text-slate-800 mb-4">Account Statistics</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="text-2xl font-bold text-blue-600 mb-2">{statistics?.studiesCreated || 0}</div>
-              <div className="text-slate-700 text-sm">Studies Created</div>
-            </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
-              <div className="text-2xl font-bold text-green-600 mb-2">{statistics?.recordsReviewed || 0}</div>
-              <div className="text-slate-700 text-sm">Records Reviewed</div>
-            </div>
-            <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <div className="text-2xl font-bold text-purple-600 mb-2">{statistics?.templatesUsed || 0}</div>
-              <div className="text-slate-700 text-sm">Templates Used</div>
             </div>
           </div>
         </Card>

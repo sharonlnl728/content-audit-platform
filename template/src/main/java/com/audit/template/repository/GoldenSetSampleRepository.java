@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -17,6 +18,7 @@ public interface GoldenSetSampleRepository extends JpaRepository<GoldenSetSample
     
     // Delete all samples by Golden Set ID
     @Modifying
+    @Transactional
     @Query("DELETE FROM GoldenSetSample gss WHERE gss.goldenSetId = :goldenSetId")
     void deleteByGoldenSetId(@Param("goldenSetId") Long goldenSetId);
 }

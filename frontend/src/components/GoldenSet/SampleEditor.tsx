@@ -1,29 +1,27 @@
 import React, { useState } from 'react';
-import {
-  Button,
-  Table,
+import { 
+  Button, 
+  Tag, 
+  Popconfirm,
+  Input,
   Modal,
   Form,
-  Input,
-  message,
-  Popconfirm,
-  Tag,
-  Tooltip,
   Select,
   Row,
   Col,
+  Progress,
+  Table,
+  Tooltip,
   Upload,
-  Progress
+  App
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import {
+import { 
   PlusOutlined,
-  EditOutlined,
   DeleteOutlined,
+  EditOutlined,
+  ImportOutlined,
   PlayCircleOutlined,
   CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  ImportOutlined,
   SearchOutlined
 } from '@ant-design/icons';
 import { GoldenSample } from '../../types/goldenSet';
@@ -34,7 +32,7 @@ import { goldenSetApi } from '../../api/goldenSet';
 
 interface SampleEditorProps {
   samples: GoldenSample[];
-  onSamplesChange: (samples: GoldenSample[]) => void;
+  onSamplesChange: (samples: GoldenSample[], operationType?: string) => void;
   onClose?: () => void;
   templateConfig?: any;
 }
@@ -63,6 +61,7 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
   onSamplesChange,
   templateConfig,
 }) => {
+  const { message } = App.useApp();
   const [editingSample, setEditingSample] = useState<GoldenSample | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -70,44 +69,23 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [stats, setStats] = useState<EvalStats | null>(null);
   const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'completed' | 'failed'>('idle');
+  const [currentTestSample, setCurrentTestSample] = useState(0);
+  const [testProgress, setTestProgress] = useState(0);
+  const [samplesToProcessCount, setSamplesToProcessCount] = useState(0);
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
-  const [currentTestSample, setCurrentTestSample] = useState<number>(0);
-  const [testProgress, setTestProgress] = useState<number>(0);
   
-  // Pagination state
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [searchText, setSearchText] = useState('');
 
-  // Filtered and paginated samples
-  const filteredSamples = samples.filter(sample => 
-    sample.content.toLowerCase().includes(searchText.toLowerCase()) ||
-    sample.expectedResult.toLowerCase().includes(searchText.toLowerCase()) ||
-    sample.category.toLowerCase().includes(searchText.toLowerCase()) ||
-    (sample.notes && sample.notes.toLowerCase().includes(searchText.toLowerCase()))
-  );
-
-  const paginatedSamples = filteredSamples.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-
-  // Handle page turning
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
 
-  // Handle page size change
   const handlePageSizeChange = (_current: number, size: number) => {
     setPageSize(size);
-    setCurrentPage(1); // Reset to first page when changing page size
-  };
-
-  // Handle search
-  const handleSearch = (value: string) => {
-    setSearchText(value);
-    setCurrentPage(1); // Reset to first page when searching
+    setCurrentPage(1);
   };
 
   // Handle file upload
@@ -123,11 +101,12 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
           expectedResult: s.expectedResult,
           category: s.category,
           severity: s.severity,
-          notes: s.notes
+          notes: s.notes,
+          aiStatus: 'PENDING' as const // Explicitly specify type
         }));
         
         // Replace existing samples
-        onSamplesChange(newSamples);
+        onSamplesChange(newSamples, 'import');
         message.success(`File "${response.data.fileName}" imported successfully with ${newSamples.length} samples`);
       } else {
         message.error(response?.data?.error || 'Failed to import file');
@@ -159,19 +138,46 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
       const values = await form.validateFields();
       
       if (editingSample) {
-        // Edit existing sample
-        const updatedSamples = samples.map(s => 
-          s.id === editingSample.id ? { ...s, ...values } : s
-        );
-        onSamplesChange(updatedSamples);
+        // Update existing sample
+        const updatedSamples = samples.map(s => {
+          if (s.sampleId === editingSample.sampleId) {
+            // First, create a copy to protect AI Status
+            const updated = { ...s };
+            
+            // Handle AI Status based on content changes
+            if (s.content !== values.content) {
+              // Content changed, reset AI Status to PENDING
+              updated.aiStatus = 'PENDING' as const;
+            } else {
+              // Content didn't change, preserve existing AI Status
+              updated.aiStatus = s.aiStatus;
+            }
+            
+            // Then update other fields from form values
+            Object.assign(updated, values);
+            
+            return updated;
+          }
+          return s;
+        });
+        onSamplesChange(updatedSamples, 'edit');
         message.success('Sample updated successfully');
       } else {
-        // Add new sample
+        // Add new sample - don't include id field, let backend generate it automatically
         const newSample: GoldenSample = {
-          id: `sample-${Date.now()}`,
-          ...values
+          id: `temp-${Date.now()}`, // Temporary ID for frontend, will be replaced by backend
+          sampleId: `sample-${Date.now()}`,
+          content: values.content,
+          expectedResult: values.expectedResult,
+          category: values.category,
+          severity: values.severity,
+          notes: values.notes,
+          aiStatus: 'PENDING' as const 
         };
-        onSamplesChange([...samples, newSample]);
+        
+      
+        const updatedSamples = [...samples, newSample as GoldenSample];
+        onSamplesChange(updatedSamples, 'add');
         message.success('Sample added successfully');
       }
       
@@ -184,39 +190,51 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
   };
 
   // Delete sample
-  const handleDeleteSample = (id: string) => {
-    const newSamples = samples.filter(s => s.id !== id);
-    onSamplesChange(newSamples);
+  const handleDeleteSample = (sampleId: string) => {
+    const newSamples = samples.filter(s => s.sampleId !== sampleId);
+    onSamplesChange(newSamples, 'delete');
     message.success('Sample deleted successfully');
   };
 
   // Batch delete
   const handleBatchDelete = () => {
-    const newSamples = samples.filter(s => !selectedRowKeys.includes(s.id));
-    onSamplesChange(newSamples);
+    const newSamples = samples.filter(s => !selectedRowKeys.includes(s.sampleId));
+    onSamplesChange(newSamples, 'batchDelete');
     setSelectedRowKeys([]);
     message.success('Selected samples deleted successfully');
   };
 
   // Run test
   const handleRunTest = async () => {
-    if (samples.length === 0) {
-      message.warning('No samples to test');
+    // Determine which samples to process based on selection
+    const samplesToProcess = selectedRowKeys.length > 0
+      ? samples.filter(s => selectedRowKeys.includes(s.sampleId))
+      : samples;
+    
+    if (samplesToProcess.length === 0) {
+      message.warning(selectedRowKeys.length > 0 
+        ? 'No samples selected for testing' 
+        : 'No samples to test'
+      );
       return;
     }
 
     setTestStatus('running');
     setCurrentTestSample(0);
     setTestProgress(0);
+    setSamplesToProcessCount(samplesToProcess.length);
     const results: TestResult[] = [];
     
+    // Create a copy of samples to collect all updates
+    const updatedSamples = [...samples];
+    
     try {
-      for (let i = 0; i < samples.length; i++) {
-        const sample = samples[i];
+      for (let i = 0; i < samplesToProcess.length; i++) {
+        const sample = samplesToProcess[i];
         
         // Update progress
         setCurrentTestSample(i + 1);
-        setTestProgress(((i + 1) / samples.length) * 100);
+        setTestProgress(Math.round(((i + 1) / samplesToProcess.length) * 100));
         
         try {
           const response = await api.auditText(sample.content, templateConfig);
@@ -227,13 +245,19 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
             const normalizedAiResult = aiResult === 'REJECT' ? 'BLOCK' : aiResult === 'APPROVE' ? 'PASS' : aiResult;
             const isCorrect = normalizedAiResult === sample.expectedResult;
             
+            // Update sample's AI status in the local copy
+            const sampleIndex = updatedSamples.findIndex(s => s.sampleId === sample.sampleId);
+            if (sampleIndex !== -1) {
+              updatedSamples[sampleIndex] = { ...sample, aiStatus: normalizedAiResult as 'PASS' | 'BLOCK' | 'REVIEW' };
+            }
+            
             let warning = '';
             if (sample.expectedResult === 'PASS' && aiResult === 'BLOCK') {
               warning = 'AI over-classified normal business content as spam';
             }
             
             results.push({
-              sampleId: sample.id,
+              sampleId: sample.sampleId,
               content: sample.content,
               aiResult,
               normalizedAiResult,
@@ -244,7 +268,7 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
             });
           } else {
             results.push({
-              sampleId: sample.id,
+              sampleId: sample.sampleId,
               content: sample.content,
               aiResult: 'ERROR',
               normalizedAiResult: 'ERROR',
@@ -255,7 +279,7 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
           }
         } catch (error) {
           results.push({
-            sampleId: sample.id,
+            sampleId: sample.sampleId,
             content: sample.content,
             aiResult: 'ERROR',
             normalizedAiResult: 'ERROR',
@@ -268,6 +292,9 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
         // Small delay to show progress
         await new Promise(resolve => setTimeout(resolve, 100));
       }
+      
+      // After all samples are processed, update the state once
+      onSamplesChange(updatedSamples, 'update');
       
       setTestResults(results);
       setTestStatus('completed');
@@ -302,233 +329,15 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
         f1,
         count: total
       });
-      
-      // Display detailed error analysis
-      const incorrect = results.filter(r => !r.isCorrect);
-      
-      message.success(`Test completed! Accuracy: ${((correct / total) * 100).toFixed(1)}%`);
-      
+
+      const actionText = selectedRowKeys.length > 0 ? 'selected samples' : 'all samples';
+      message.success(`Test completed on ${actionText}! Accuracy: ${((correct / total) * 100).toFixed(1)}%`);
+
     } catch (error) {
       console.error('Test failed:', error);
       setTestStatus('failed');
       message.error('Test failed');
     }
-  };
-
-  // Get table column definitions
-  const getColumns = (): ColumnsType<GoldenSample> => {
-    const baseColumns: ColumnsType<GoldenSample> = [
-      {
-        title: 'Content',
-        dataIndex: 'content',
-        key: 'content',
-        width: '30%',
-        render: (text: string) => (
-          <Tooltip title={text}>
-            <span className="truncate-text">{text}</span>
-          </Tooltip>
-        ),
-      },
-      {
-        title: 'Expected',
-        dataIndex: 'expectedResult',
-        key: 'expectedResult',
-        width: '10%',
-        render: (text: string) => (
-          <Tag color={text === 'BLOCK' ? 'red' : text === 'REVIEW' ? 'orange' : 'blue'}>
-            {text}
-          </Tag>
-        ),
-      },
-    ];
-
-    // If there are test results, add extra columns
-    if (testResults.length > 0) {
-      baseColumns.push(
-        {
-          title: 'AI Result',
-          key: 'aiResult',
-          width: '10%',
-          render: (_: any, record: GoldenSample) => {
-            const result = testResults.find(r => r.sampleId === record.id);
-            if (!result) return '-';
-            
-            return (
-              <Tag color={result.aiResult === 'BLOCK' || result.aiResult === 'REJECT' ? 'red' : result.aiResult === 'PASS' || result.aiResult === 'APPROVE' ? 'blue' : 'orange'}>
-                {result.aiResult}
-              </Tag>
-            );
-          },
-        },
-        {
-          title: 'Match?',
-          key: 'isCorrect',
-          width: '8%',
-          render: (_: any, record: GoldenSample) => {
-            const result = testResults.find(r => r.sampleId === record.id);
-            if (!result) return '-';
-            
-            return result.isCorrect ? (
-              <CheckCircleOutlined className="text-green-500 text-lg" />
-            ) : (
-              <ExclamationCircleOutlined className="text-red-500 text-lg" />
-            );
-          },
-        },
-        {
-          title: 'Category',
-          dataIndex: 'category',
-          key: 'category',
-          width: '12%',
-          render: (text: string) => (
-            <Tag color="default">{text}</Tag>
-          ),
-        },
-        {
-          title: 'Severity',
-          dataIndex: 'severity',
-          key: 'severity',
-          width: '10%',
-          render: (text: string) => (
-            <Tag color={text === 'high' ? 'red' : text === 'medium' ? 'orange' : 'green'}>
-              {text}
-            </Tag>
-          ),
-        },
-        {
-          title: 'AI Categories',
-          key: 'aiCategories',
-          width: '15%',
-          render: (_: any, record: GoldenSample) => {
-            const result = testResults.find(r => r.sampleId === record.id);
-            if (!result) return '-';
-            
-            const displayCategories = result.aiCategories.slice(0, 2);
-            const remainingCount = result.aiCategories.length - 2;
-            
-            return (
-              <div>
-                {displayCategories.map((cat, index) => (
-                  <Tag key={index} className="mb-1">
-                    {cat}
-                  </Tag>
-                ))}
-                {remainingCount > 0 && (
-                  <Tag className="mb-1">
-                    +{remainingCount}
-                  </Tag>
-                )}
-                {result.warning && (
-                  <div className="text-xs text-red-500 mt-1">
-                    ⚠️ {result.warning}
-                  </div>
-                )}
-              </div>
-            );
-          },
-        },
-        {
-          title: 'Notes',
-          dataIndex: 'notes',
-          key: 'notes',
-          width: '15%',
-          render: (text: string) => text || '-',
-        },
-        {
-          title: 'Actions',
-          key: 'actions',
-          width: '15%',
-          render: (_: any, record: GoldenSample) => (
-            <div className="flex items-center space-x-2">
-              <Tooltip title="Edit">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined />}
-                  onClick={() => handleEditSample(record)}
-                />
-              </Tooltip>
-              <Popconfirm
-                title="Are you sure you want to delete this sample?"
-                onConfirm={() => handleDeleteSample(record.id)}
-                okText="Yes"
-                cancelText="No"
-              >
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                />
-              </Popconfirm>
-            </div>
-          )
-        }
-      );
-    } else {
-      // Columns when no test results
-      baseColumns.push(
-        {
-          title: 'Category',
-          dataIndex: 'category',
-          key: 'category',
-          width: '12%',
-          render: (text: string) => (
-            <Tag color="default">{text}</Tag>
-          ),
-        },
-        {
-          title: 'Severity',
-          dataIndex: 'severity',
-          key: 'severity',
-          width: '10%',
-          render: (text: string) => (
-            <Tag color={text === 'high' ? 'red' : text === 'medium' ? 'orange' : 'green'}>
-              {text}
-            </Tag>
-          ),
-        },
-        {
-          title: 'Notes',
-          dataIndex: 'notes',
-          key: 'notes',
-          width: '15%',
-          render: (text: string) => text || '-',
-        },
-        {
-          title: 'Actions',
-          key: 'actions',
-          width: '15%',
-          render: (_: any, record: GoldenSample) => (
-            <div className="flex items-center space-x-2">
-              <Tooltip title="Edit">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined />}
-                  onClick={() => handleEditSample(record)}
-                />
-              </Tooltip>
-              <Popconfirm
-                title="Are you sure you want to delete this sample?"
-                onConfirm={() => handleDeleteSample(record.id)}
-                okText="Yes"
-                cancelText="No"
-              >
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                />
-              </Popconfirm>
-            </div>
-          )
-        }
-      );
-    }
-
-    return baseColumns;
   };
 
   return (
@@ -544,25 +353,41 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
         </Button>
         
         <Button
-          icon={<ImportOutlined />}
-          onClick={handleImportPresetSamples}
-        >
-          Import
-        </Button>
-        
-        <Button
           icon={<PlayCircleOutlined />}
           onClick={handleRunTest}
           loading={testStatus === 'running'}
           disabled={samples.length === 0}
         >
-          Run Test
+          {selectedRowKeys.length > 0 
+            ? `Run Test Selected (${selectedRowKeys.length})` 
+            : `Run Test All (${samples.length})`
+          }
         </Button>
         
-        {testResults.length > 0 && (
+        {(testResults.length > 0 || stats !== null || testStatus !== 'idle' || samples.some(s => s.aiStatus !== 'PENDING')) && (
           <Button
             icon={<CheckCircleOutlined />}
             onClick={() => {
+              if (selectedRowKeys.length > 0) {
+                // Clear only selected samples' AI Status
+                const resetSamples = samples.map(sample => {
+                  if (selectedRowKeys.includes(sample.sampleId)) {
+                    return { ...sample, aiStatus: 'PENDING' as const };
+                  }
+                  return sample;
+                });
+                onSamplesChange(resetSamples, 'update');
+                message.success(`Cleared AI Status for ${selectedRowKeys.length} selected samples`);
+              } else {
+                // Clear all samples' AI Status
+                const resetSamples = samples.map(sample => ({
+                  ...sample,
+                  aiStatus: 'PENDING' as const
+                }));
+                onSamplesChange(resetSamples, 'update');
+                message.success('Cleared AI Status for all samples');
+              }
+              
               setTestResults([]);
               setStats(null);
               setTestStatus('idle');
@@ -570,7 +395,10 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
               setTestProgress(0);
             }}
           >
-            Clear Results
+            {selectedRowKeys.length > 0 
+              ? `Clear Selected (${selectedRowKeys.length})` 
+              : 'Clear All Results'
+            }
           </Button>
         )}
         
@@ -588,11 +416,20 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
         )}
         
         {/* Search box */}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            icon={<ImportOutlined />}
+            onClick={handleImportPresetSamples}
+          >
+            Import
+          </Button>
           <Input.Search
             placeholder="Search samples..."
             allowClear
-            onSearch={handleSearch}
+            onSearch={(value) => {
+              // Simple search implementation
+              console.log('Searching for:', value);
+            }}
             style={{ width: 250 }}
             prefix={<SearchOutlined />}
           />
@@ -604,7 +441,7 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
         <div className="mb-4 p-4 border rounded-lg bg-blue-50">
           <div className="flex items-center justify-between mb-2">
             <span>Running test...</span>
-            <span>{currentTestSample} / {samples.length}</span>
+            <span>{currentTestSample} / {samplesToProcessCount} ({testProgress.toFixed(0)}%)</span>
           </div>
           <Progress percent={testProgress} />
         </div>
@@ -646,17 +483,105 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
 
       {/* Sample table */}
       <Table
-        columns={getColumns()}
-        dataSource={paginatedSamples}
-        rowKey="id"
+        dataSource={samples}
+        rowKey="sampleId"
         rowSelection={{
-          selectedRowKeys,
-          onChange: setSelectedRowKeys,
+          selectedRowKeys: selectedRowKeys,
+          onChange: (selectedRowKeys, _selectedRows) => {
+            setSelectedRowKeys(selectedRowKeys);
+          },
         }}
+        columns={[
+          {
+            title: 'Content',
+            dataIndex: 'content',
+            key: 'content',
+            width: '35%',
+            render: (text: string) => (
+              <Tooltip title={text}>
+                <span className="truncate-text">{text}</span>
+              </Tooltip>
+            ),
+          },
+          {
+            title: 'Expected',
+            dataIndex: 'expectedResult',
+            key: 'expectedResult',
+            width: '12%',
+            render: (text: string) => (
+              <Tag color={text === 'BLOCK' ? 'red' : text === 'REVIEW' ? 'orange' : 'blue'}>
+                {text}
+              </Tag>
+            ),
+          },
+          {
+            title: 'AI Status',
+            dataIndex: 'aiStatus',
+            key: 'aiStatus',
+            width: '12%',
+            render: (text: string) => {
+              if (!text || text === 'PENDING') {
+                return <Tag color="default">PENDING</Tag>;
+              }
+              const color = text === 'BLOCK' ? 'red' : text === 'REVIEW' ? 'orange' : 'blue';
+              return <Tag color={color}>{text}</Tag>;
+            },
+          },
+          {
+            title: 'Category',
+            dataIndex: 'category',
+            key: 'category',
+            width: '12%',
+            render: (text: string) => (
+              <Tag color="default">{text}</Tag>
+            ),
+          },
+          {
+            title: 'Severity',
+            dataIndex: 'severity',
+            key: 'severity',
+            width: '12%',
+            render: (text: string) => (
+              <Tag color={text === 'high' ? 'red' : text === 'medium' ? 'orange' : 'green'}>
+                {text}
+              </Tag>
+            ),
+          },
+          {
+            title: 'Actions',
+            key: 'actions',
+            width: '12%',
+            render: (_: any, record: GoldenSample) => (
+              <div className="flex items-center space-x-2">
+                <Tooltip title="Edit">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => handleEditSample(record)}
+                  />
+                </Tooltip>
+                <Popconfirm
+                  title="Are you sure you want to delete this sample?"
+                  onConfirm={() => handleDeleteSample(record.sampleId)}
+                  okText="Yes"
+                  cancelText="No"
+                >
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                  />
+                </Popconfirm>
+              </div>
+            )
+          }
+        ]}
         pagination={{
-          total: filteredSamples.length,
           current: currentPage,
           pageSize: pageSize,
+          total: samples.length,
           onChange: handlePageChange,
           onShowSizeChange: handlePageSizeChange,
           showSizeChanger: true,
@@ -684,7 +609,7 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
             label="Content"
             rules={[{ required: true, message: "Please input content!" }]}
           >
-            <Input.TextArea rows={4} />
+            <Input.TextArea id="sample-content" rows={4} />
           </Form.Item>
           
           <Row gutter={16}>
@@ -694,7 +619,7 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
                 label="Expected Result"
                 rules={[{ required: true, message: "Please select expected result!" }]}
               >
-                <Select>
+                <Select id="sample-expected-result">
                   <Select.Option value="PASS">PASS</Select.Option>
                   <Select.Option value="BLOCK">BLOCK</Select.Option>
                   <Select.Option value="REVIEW">REVIEW</Select.Option>
@@ -708,7 +633,7 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
                 label="Category"
                 rules={[{ required: true, message: "Please select category!" }]}
               >
-                <Select>
+                <Select id="sample-category">
                   <Select.Option value="compliance">Compliance</Select.Option>
                   <Select.Option value="common_violation">Common Violation</Select.Option>
                   <Select.Option value="edge_case">Edge Case</Select.Option>
@@ -723,7 +648,7 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
                 label="Severity"
                 rules={[{ required: true, message: "Please select severity!" }]}
               >
-                <Select>
+                <Select id="sample-severity">
                   <Select.Option value="low">Low</Select.Option>
                   <Select.Option value="medium">Medium</Select.Option>
                   <Select.Option value="high">High</Select.Option>
@@ -733,7 +658,7 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
           </Row>
           
           <Form.Item name="notes" label="Notes">
-            <Input.TextArea rows={2} />
+            <Input.TextArea id="sample-notes" rows={2} />
           </Form.Item>
         </Form>
       </Modal>
@@ -809,14 +734,16 @@ const SampleEditor: React.FC<SampleEditorProps> = ({
                     if (templateData && samples && Array.isArray(samples)) {
                       const newSamples: GoldenSample[] = samples.map((s: any) => ({
                         id: s.id || `sample-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        sampleId: s.sampleId || s.id || `sample-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                         content: s.content,
                         expectedResult: s.expectedResult,
                         category: s.category || 'compliance',
                         severity: s.severity || 'medium',
-                        notes: s.notes || ''
+                        notes: s.notes || '',
+                        aiStatus: 'PENDING' as const // Explicitly specify type
                       }));
                       
-                      onSamplesChange(newSamples);
+                      onSamplesChange(newSamples, 'import');
                       message.success(`JSON content imported successfully with ${newSamples.length} samples`);
                       setImportModalVisible(false);
                     } else {

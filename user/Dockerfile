@@ -1,39 +1,37 @@
-# 构建阶段
-FROM maven:3.8.4-openjdk-17 AS builder
+# Build stage
+FROM maven:3.8.4-openjdk-11 AS builder
 
 WORKDIR /app
 COPY pom.xml .
 COPY src ./src
 
-# 编译Java代码
+# Compile Java code
 RUN mvn clean package -DskipTests
 
-# 运行阶段
-FROM openjdk:17-slim
+# Runtime stage
+FROM openjdk:11-jre-slim
 
-# 设置时区为UTC
+# Set timezone to UTC
 ENV TZ=UTC
-RUN apt-get update && apt-get install -y tzdata netcat-openbsd postgresql-client curl && \
-    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
-    echo $TZ > /etc/timezone && \
-    rm -rf /var/lib/apt/lists/*
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 WORKDIR /app
 
-# 从构建阶段复制JAR文件
+# Copy JAR file from build stage
 COPY --from=builder /app/target/*.jar app.jar
 
-# 复制配置文件
-COPY src/main/resources/application-docker.yml /app/application-docker.yml
+# Copy configuration files
+COPY src/main/resources/application.yml ./config/
 
-# 安装必要的工具
-RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client curl && rm -rf /var/lib/apt/lists/*
+# Install necessary tools
+RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client curl tzdata && rm -rf /var/lib/apt/lists/*
 
-# 复制启动脚本
+# Copy startup script
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
+# Expose port
 EXPOSE 8081
 
-# 使用新的启动脚本
-ENTRYPOINT ["/start.sh"] 
+# Use new startup script
+CMD ["/start.sh"] 

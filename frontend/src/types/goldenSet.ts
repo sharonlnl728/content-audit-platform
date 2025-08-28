@@ -13,12 +13,15 @@ export interface GoldenSet {
 
 // Golden Set sample
 export interface GoldenSample {
-  id: string;
+  id: string;           // Frontend business ID, string type
+  sampleId: string;     // Business identifier, required
+  goldenSetId?: number; // Associated ID, optional (not available when newly created)
   content: string;
   expectedResult: 'PASS' | 'BLOCK' | 'REVIEW';
   category: 'common_violation' | 'compliance' | 'edge_case' | 'boundary_test';
   notes?: string;
   severity?: 'low' | 'medium' | 'high';
+  aiStatus: 'PENDING' | 'PASS' | 'BLOCK' | 'REVIEW'; // Remove optional marker, ensure type consistency
 }
 
 // Golden Set validation result

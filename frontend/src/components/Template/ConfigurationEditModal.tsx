@@ -114,7 +114,7 @@ const ConfigurationEditModal: React.FC<ConfigurationEditModalProps> = ({
         }
         
         // Call API to update template configuration
-        const response = await api.updateTemplate(template.id, updatedTemplate);
+        await api.updateTemplate(template.id, updatedTemplate);
         
         onSuccess(updatedTemplate);
       }

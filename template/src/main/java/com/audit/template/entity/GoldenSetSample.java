@@ -1,6 +1,6 @@
 package com.audit.template.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import javax.persistence.*;
 import java.time.LocalDateTime;
@@ -8,11 +8,18 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "golden_set_samples")
 public class GoldenSetSample {
+    
+    // AI Status enum
+    public enum AiStatus {
+        PENDING, PASS, BLOCK, REVIEW
+    }
+    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(name = "golden_set_id", nullable = false)
+    // Keep goldenSetId field, but use insertable=false and updatable=false to avoid duplicate mapping
+    @Column(name = "golden_set_id", nullable = false, insertable = false, updatable = false)
     private Long goldenSetId;
     
     @Column(name = "sample_id", nullable = false)
@@ -29,16 +36,21 @@ public class GoldenSetSample {
     
     private String severity;
     
+    @Column
     private String notes;
-    
-    @Column(name = "created_at")
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_status", nullable = false)
+    private AiStatus aiStatus = AiStatus.PENDING;
+
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
-    
-    @Column(name = "updated_at")
+
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "golden_set_id", insertable = false, updatable = false)
+    @JoinColumn(name = "golden_set_id", nullable = false)
     @JsonBackReference
     private GoldenSet goldenSet;
     
@@ -79,6 +91,9 @@ public class GoldenSetSample {
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     
+    public AiStatus getAiStatus() { return aiStatus; }
+    public void setAiStatus(AiStatus aiStatus) { this.aiStatus = aiStatus; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     

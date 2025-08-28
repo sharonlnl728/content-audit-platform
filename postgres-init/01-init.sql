@@ -329,15 +329,110 @@ LEFT JOIN audit_records ar ON ar.rule_results @> jsonb_build_array(jsonb_build_o
 GROUP BY r.rule_id, r.category, r.label
 ORDER BY usage_count DESC;
 
--- 设置权限
+-- Set permissions
+GRANT ALL PRIVILEGES ON DATABASE content_audit TO admin;
+GRANT ALL PRIVILEGES ON SCHEMA public TO admin;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO admin;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO admin;
-GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO admin;
 
--- 创建只读用户（可选）
+-- Create read-only user (optional)
 -- CREATE USER readonly WITH PASSWORD 'readonly123';
 -- GRANT CONNECT ON DATABASE content_audit TO readonly;
 -- GRANT USAGE ON SCHEMA public TO readonly;
 -- GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly;
 
-COMMIT; 
+-- ========================================
+-- Golden Sets and Samples Tables
+-- ========================================
+
+-- Create Golden Sets table
+CREATE TABLE IF NOT EXISTS golden_sets (
+    id BIGSERIAL PRIMARY KEY,
+    template_id VARCHAR(50) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    category VARCHAR(100) NOT NULL,
+    version VARCHAR(20) DEFAULT '1.0.0',
+    created_by BIGINT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_default BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+-- Create Golden Set Samples table
+CREATE TABLE IF NOT EXISTS golden_set_samples (
+    id BIGSERIAL PRIMARY KEY,
+    golden_set_id BIGINT NOT NULL,
+    sample_id VARCHAR(100) NOT NULL,
+    content TEXT NOT NULL,
+    expected_result VARCHAR(20) NOT NULL CHECK (expected_result IN ('PASS', 'BLOCK', 'REVIEW')),
+    category VARCHAR(100),
+    severity VARCHAR(20) DEFAULT 'medium' CHECK (severity IN ('low', 'medium', 'high')),
+    notes TEXT,
+    ai_status VARCHAR(20) DEFAULT 'PENDING' CHECK (ai_status IN ('PENDING', 'PASS', 'BLOCK', 'REVIEW')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (golden_set_id) REFERENCES golden_sets(id) ON DELETE CASCADE,
+    UNIQUE(golden_set_id, sample_id)
+);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_golden_sets_template_id ON golden_sets(template_id);
+CREATE INDEX IF NOT EXISTS idx_golden_sets_created_by ON golden_sets(created_by);
+CREATE INDEX IF NOT EXISTS idx_golden_sets_category ON golden_sets(category);
+CREATE INDEX IF NOT EXISTS idx_golden_sets_active ON golden_sets(is_active);
+CREATE INDEX IF NOT EXISTS idx_golden_set_samples_golden_set_id ON golden_set_samples(golden_set_id);
+CREATE INDEX IF NOT EXISTS idx_golden_set_samples_expected_result ON golden_set_samples(expected_result);
+CREATE INDEX IF NOT EXISTS idx_golden_set_samples_category ON golden_set_samples(category);
+CREATE INDEX IF NOT EXISTS idx_golden_set_samples_ai_status ON golden_set_samples(ai_status);
+
+-- Fix existing data: set default values for records where created_by is NULL
+UPDATE golden_sets SET created_by = 1 WHERE created_by IS NULL;
+
+-- Add NOT NULL constraint to existing table (if table already exists)
+ALTER TABLE golden_sets ALTER COLUMN created_by SET NOT NULL;
+
+-- Insert default Landing Page Golden Set
+INSERT INTO golden_sets (template_id, name, description, category, version, created_by, is_default) 
+VALUES ('TPL-LANDING-PAGE', 'Landing Page Ad Review', 'Default golden set for landing page advertisement review', 'content_moderation', '1.0.0', 1, true)
+ON CONFLICT (template_id) DO NOTHING;
+
+-- Get the newly inserted Golden Set ID and insert samples
+DO $$
+DECLARE
+    golden_set_id BIGINT;
+BEGIN
+    SELECT id INTO golden_set_id FROM golden_sets WHERE template_id = 'TPL-LANDING-PAGE' LIMIT 1;
+    
+    -- Insert 11 samples
+    INSERT INTO golden_set_samples (golden_set_id, sample_id, content, expected_result, category, severity) VALUES
+        (golden_set_id, 'sample-001', 'Get 99% OFF - Limited Time Only! Everything Must Go!', 'BLOCK', 'common_violation', 'high'),
+        (golden_set_id, 'sample-002', 'Ancient Alien Technology Revealed - Scientists Baffled!', 'BLOCK', 'edge_case', 'high'),
+        (golden_set_id, 'sample-003', 'Trusted by 10 Billion People Worldwide!', 'BLOCK', 'compliance', 'high'),
+        (golden_set_id, 'sample-004', 'Turn $100 into $1 Million in 24 Hours!', 'BLOCK', 'common_violation', 'high'),
+        (golden_set_id, 'sample-005', 'Lose 50 Pounds in 1 Week - Guaranteed!', 'BLOCK', 'edge_case', 'high'),
+        (golden_set_id, 'sample-006', 'Professional Web Design Services - Custom Solutions', 'PASS', 'compliance', 'low'),
+        (golden_set_id, 'sample-007', 'Secure Payment Gateway - Bank Level Security', 'PASS', 'compliance', 'low'),
+        (golden_set_id, 'sample-008', 'Mobile Optimized - Works on All Devices', 'PASS', 'compliance', 'low'),
+        (golden_set_id, 'sample-009', 'Limited Stock - Only 5 Items Left', 'REVIEW', 'edge_case', 'medium'),
+        (golden_set_id, 'sample-010', 'Exclusive VIP Access - By Invitation Only', 'REVIEW', 'edge_case', 'medium'),
+        (golden_set_id, 'sample-011', 'Advanced Features - Cutting Edge Technology', 'PASS', 'compliance', 'low');
+END $$;
+
+-- Create update time trigger function
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Create triggers for updating timestamps
+CREATE TRIGGER update_golden_sets_updated_at BEFORE UPDATE ON golden_sets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_golden_set_samples_updated_at BEFORE UPDATE ON golden_set_samples FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ========================================
+-- Database initialization completed
+-- ======================================== 

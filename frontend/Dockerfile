@@ -1,20 +1,20 @@
-# 使用nginx作为静态文件服务器
+# Use nginx as static file server
 FROM nginx:alpine
 
-# 设置时区为UTC (前端容器时区不重要，因为前端会智能转换)
+# Set timezone to UTC (frontend container timezone is not important as frontend will intelligently convert)
 ENV TZ=UTC
 RUN apk add --no-cache tzdata && \
     ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     echo $TZ > /etc/timezone
 
-# 复制构建后的文件到nginx目录
+# Copy built files to nginx directory
 COPY dist/ /usr/share/nginx/html/
 
-# 复制nginx配置
+# Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# 暴露80端口
+# Expose port 80
 EXPOSE 80
 
-# 启动nginx
+# Start nginx
 CMD ["nginx", "-g", "daemon off;"] 

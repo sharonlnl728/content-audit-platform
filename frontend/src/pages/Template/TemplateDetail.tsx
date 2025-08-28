@@ -6,9 +6,9 @@ import {
   Space, 
   Typography,
   Tabs,
-  message,
   Popconfirm,
-  Input
+  Input,
+  App
 } from 'antd';
 import { 
   ArrowLeftOutlined,
@@ -35,6 +35,7 @@ const { Title, Text } = Typography;
 const TemplateDetail: React.FC = () => {
   const navigate = useNavigate();
   const { templateId } = useParams<{ templateId: string }>();
+  const { message: messageApi } = App.useApp();
   const [template, setTemplate] = useState<AuditTemplate | null>(null);
   const [loading, setLoading] = useState(true);
   const [goldenSets, setGoldenSets] = useState<GoldenSet[]>([]);
@@ -63,7 +64,7 @@ const TemplateDetail: React.FC = () => {
       const templateId = parseInt(templateIdParam);
       if (isNaN(templateId)) {
         console.error('Invalid templateId:', templateIdParam);
-        message.error('Invalid template ID');
+        messageApi.error('Invalid template ID');
         navigate('/templates');
         return;
       }
@@ -77,12 +78,12 @@ const TemplateDetail: React.FC = () => {
         // Use the string templateId from template data to match database storage
         loadExistingGoldenSets(templateData.templateId);
       } else {
-        message.error('Failed to fetch template details');
+        messageApi.error('Failed to fetch template details');
         navigate('/templates');
       }
     } catch (error) {
       console.error('Error fetching template:', error);
-      message.error('Failed to fetch template details');
+      messageApi.error('Failed to fetch template details');
       navigate('/templates');
     } finally {
       setLoading(false);
@@ -142,13 +143,13 @@ const TemplateDetail: React.FC = () => {
         setGoldenSets(newGoldenSets);
         setSelectedGoldenSet(createdGoldenSet);
         setActiveTab('goldenSets');
-        message.success('Golden Set created successfully');
+        messageApi.success('Golden Set created successfully');
       } else {
-        message.error('Failed to create Golden Set');
+        messageApi.error('Failed to create Golden Set');
       }
     } catch (error) {
       console.error('Error creating Golden Set:', error);
-      message.error('Failed to create Golden Set');
+      messageApi.error('Failed to create Golden Set');
     }
   };
 
@@ -157,7 +158,7 @@ const TemplateDetail: React.FC = () => {
     // First find the Golden Set's database ID
     const goldenSet = goldenSets.find(gs => gs.id === id);
     if (!goldenSet || typeof goldenSet.id !== 'number') {
-      message.error('Invalid golden set ID');
+      messageApi.error('Invalid golden set ID');
       return;
     }
     
@@ -172,13 +173,13 @@ const TemplateDetail: React.FC = () => {
         if (selectedGoldenSet?.id === id) {
           setSelectedGoldenSet(newGoldenSets[0] || null);
         }
-        message.success('Golden Set deleted successfully');
+        messageApi.success('Golden Set deleted successfully');
       } else {
-        message.error('Failed to delete Golden Set');
+        messageApi.error('Failed to delete Golden Set');
       }
     } catch (error) {
       console.error('Error deleting Golden Set:', error);
-      message.error('Failed to delete Golden Set');
+      messageApi.error('Failed to delete Golden Set');
     }
   };
 
@@ -201,13 +202,13 @@ const TemplateDetail: React.FC = () => {
         const copiedGoldenSet = response.data.data;
         const newGoldenSets = [...goldenSets, copiedGoldenSet];
         setGoldenSets(newGoldenSets);
-        message.success('Golden Set copied successfully');
+        messageApi.success('Golden Set copied successfully');
       } else {
-        message.error('Failed to copy Golden Set');
+        messageApi.error('Failed to copy Golden Set');
       }
     } catch (error) {
       console.error('Error copying Golden Set:', error);
-      message.error('Failed to copy Golden Set');
+      messageApi.error('Failed to copy Golden Set');
     }
   };
 
@@ -258,13 +259,13 @@ const TemplateDetail: React.FC = () => {
         
         setEditingGoldenSetId(null);
         setEditingGoldenSetName('');
-        message.success('Golden Set name updated successfully');
+        messageApi.success('Golden Set name updated successfully');
       } else {
-        message.error('Failed to update Golden Set name');
+        messageApi.error('Failed to update Golden Set name');
       }
     } catch (error) {
       console.error('Error updating Golden Set name:', error);
-      message.error('Failed to update Golden Set name');
+      messageApi.error('Failed to update Golden Set name');
     }
   };
 
@@ -779,18 +780,93 @@ const TemplateDetail: React.FC = () => {
                         
                         <SampleEditor
                           samples={selectedGoldenSet.samples}
-                          onSamplesChange={(updatedSamples: GoldenSample[]) => {
-                            const updatedGoldenSet: GoldenSet = {
-                              ...selectedGoldenSet,
-                              samples: updatedSamples,
-                              updatedAt: new Date().toISOString()
-                            };
-                            const newGoldenSets = goldenSets.map(gs =>
-                              gs.id === selectedGoldenSet.id ? updatedGoldenSet : gs
-                            );
-                            setGoldenSets(newGoldenSets);
-                            setSelectedGoldenSet(updatedGoldenSet);
-                            // saveGoldenSetsToStorage(newGoldenSets); // deprecated, now directly call API
+                          onSamplesChange={async (updatedSamples: GoldenSample[], operationType?: string) => {
+                            try {
+                              console.log('onSamplesChange called with operationType:', operationType);
+                              
+                              if (operationType === 'delete') {
+                                // For delete operations, we need to handle it differently
+                                // The updatedSamples already has the deleted samples removed
+                                // We need to save this state to the backend
+                                const updatedGoldenSet: GoldenSet = {
+                                  ...selectedGoldenSet,
+                                  samples: updatedSamples,
+                                  updatedAt: new Date().toISOString()
+                                };
+                                
+                                // Clean up samples data, remove id field to avoid backend type errors
+                                const cleanedSamples = updatedSamples.map(sample => {
+                                  const { id, ...sampleWithoutId } = sample;
+                                  return sampleWithoutId;
+                                });
+                                
+                                // Save to database
+                                const response = await goldenSetApi.updateGoldenSet(parseInt(selectedGoldenSet.id), {
+                                  id: parseInt(selectedGoldenSet.id),
+                                  templateId: selectedGoldenSet.templateId,
+                                  name: selectedGoldenSet.name,
+                                  description: selectedGoldenSet.description,
+                                  category: selectedGoldenSet.category,
+                                  version: selectedGoldenSet.version,
+                                  createdAt: selectedGoldenSet.createdAt,
+                                  updatedAt: updatedGoldenSet.updatedAt,
+                                  samples: cleanedSamples
+                                });
+                                
+                                if (response?.data?.ok === true) {
+                                  // Update local state after successful save
+                                  const newGoldenSets = goldenSets.map(gs =>
+                                    gs.id === selectedGoldenSet.id ? updatedGoldenSet : gs
+                                  );
+                                  setGoldenSets(newGoldenSets);
+                                  setSelectedGoldenSet(updatedGoldenSet);
+                                } else {
+                                  messageApi.error(response?.data?.error || 'Failed to delete Golden Set samples');
+                                }
+                              } else {
+                                // For other operations (add, edit, update), use existing logic
+                                const updatedGoldenSet: GoldenSet = {
+                                  ...selectedGoldenSet,
+                                  samples: updatedSamples,
+                                  updatedAt: new Date().toISOString()
+                                };
+                                
+                                // Clean up samples data, remove id field to avoid backend type errors
+                                const cleanedSamples = updatedSamples.map(sample => {
+                                  const { id, ...sampleWithoutId } = sample;
+                                  return sampleWithoutId;
+                                });
+                                
+                                // Save to database first - pass complete GoldenSet data
+                                const response = await goldenSetApi.updateGoldenSet(parseInt(selectedGoldenSet.id), {
+                                  id: parseInt(selectedGoldenSet.id),
+                                  templateId: selectedGoldenSet.templateId,
+                                  name: selectedGoldenSet.name,
+                                  description: selectedGoldenSet.description,
+                                  category: selectedGoldenSet.category,
+                                  version: selectedGoldenSet.version,
+                                  createdAt: selectedGoldenSet.createdAt,
+                                  updatedAt: updatedGoldenSet.updatedAt,
+                                  samples: cleanedSamples
+                                });
+                                
+                                if (response?.data?.ok === true) {
+                                  // Update local state after successful save
+                                  const newGoldenSets = goldenSets.map(gs =>
+                                    gs.id === selectedGoldenSet.id ? updatedGoldenSet : gs
+                                  );
+                                  setGoldenSets(newGoldenSets);
+                                  setSelectedGoldenSet(updatedGoldenSet);
+                                  
+                                  // No need to show additional messages, as SampleEditor already shows specific operation messages
+                                } else {
+                                  messageApi.error(response?.data?.error || 'Failed to save Golden Set samples');
+                                }
+                              }
+                            } catch (error) {
+                              console.error('Error saving Golden Set samples:', error);
+                              messageApi.error('Failed to save Golden Set samples');
+                            }
                           }}
                           templateConfig={(() => {
                             try {
@@ -829,7 +905,7 @@ const TemplateDetail: React.FC = () => {
           onSuccess={(updatedTemplate) => {
             setTemplate(updatedTemplate);
             setEditMode(false);
-            message.success('Template updated successfully');
+            messageApi.success('Template updated successfully');
           }}
         />
       )}
@@ -844,7 +920,7 @@ const TemplateDetail: React.FC = () => {
           onSuccess={(updatedTemplate) => {
             setTemplate(updatedTemplate);
             setEditRulesMode(false);
-            message.success('Rules configuration updated successfully');
+            messageApi.success('Rules configuration updated successfully');
           }}
         />
       )}
@@ -858,7 +934,7 @@ const TemplateDetail: React.FC = () => {
           onSuccess={(updatedTemplate) => {
             setTemplate(updatedTemplate);
             setEditDecisionMode(false);
-            message.success('Decision logic updated successfully');
+            messageApi.success('Decision logic updated successfully');
           }}
         />
       )}
@@ -872,7 +948,7 @@ const TemplateDetail: React.FC = () => {
           onSuccess={(updatedTemplate) => {
             setTemplate(updatedTemplate);
             setEditPromptMode(false);
-            message.success('AI prompt template updated successfully');
+            messageApi.success('AI prompt template updated successfully');
           }}
         />
       )}
@@ -886,7 +962,7 @@ const TemplateDetail: React.FC = () => {
           onSuccess={(updatedTemplate) => {
             setTemplate(updatedTemplate);
             setEditMetadataMode(false);
-            message.success('Metadata updated successfully');
+            messageApi.success('Metadata updated successfully');
           }}
         />
       )}

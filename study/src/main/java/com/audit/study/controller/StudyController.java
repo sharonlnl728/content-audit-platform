@@ -2,10 +2,10 @@ package com.audit.study.controller;
 
 import com.audit.study.dto.ApiResponse;
 import com.audit.study.dto.StudyDto;
-import com.audit.study.entity.Study;
+
 import com.audit.study.dto.StudyRecordBatchRequest;
 import com.audit.study.dto.StudyRecordDto;
-import com.audit.study.dto.StudyRecordsPageResponse;
+
 import com.audit.study.service.StudyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
