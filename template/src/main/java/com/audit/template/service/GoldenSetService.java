@@ -113,9 +113,6 @@ public class GoldenSetService {
         System.out.println("New samples count: " + newSamples.size());
         
         // Create maps for efficient lookup
-        Map<String, GoldenSetSample> existingSamplesMap = existingSamples.stream()
-                .collect(Collectors.toMap(GoldenSetSample::getSampleId, sample -> sample));
-        
         Map<String, GoldenSetSample> newSamplesMap = newSamples.stream()
                 .collect(Collectors.toMap(GoldenSetSample::getSampleId, sample -> sample));
         
